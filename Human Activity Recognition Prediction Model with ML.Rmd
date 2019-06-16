@@ -1,0 +1,93 @@
+---
+title: 'Human Activity Recognition: Prediction Model with Random Forest'
+author: "Alán García Bernal"
+date: "13/6/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Human Activity Recognition: Random Forest Prediction
+
+### Synopsis
+
+The goal of this project is to use the data from  different sensors (placed in: arm, forearm, dumbbell and belt) to create a machine learning model to predict if the user is properly performing barbell lifts. More information about the data [here](http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har). The model will be made using a *Random Forest* algorithm with 500 trees, 2 variables at each split, and an ***Out of Sample Error*** of 0.43%.
+
+
+### Downloading and Reading Data
+
+We are provided with a [training](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","./pml-training.csv) and a [testing](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv) data sets that will be downloaded and read it into 'training' and 'testing' data sets respectively.
+```{r cars, cache=TRUE}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv","./pml-training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "./pml-testing.csv")
+
+training <- read.csv("pml-training.csv")
+testing <- read.csv("pml-testing.csv")
+```
+
+### Exploratory Data Analysis and Data Preparation
+
+The training data set is quite big, consisting of 19,662 observations for 160 variables. But, after a quick glance at the data we find there are lots of variables with mostly NA's or blank values.
+```{r reomving NAs}
+na.cols <- colnames(training)[colSums(is.na(training)) > 0]
+training <- training[,-which(colnames(training) %in% na.cols)]
+
+blank.cols <- colnames(training)[colSums(training == "") > 0]
+training <- training[,-which(colnames(training) %in% blank.cols)]
+```
+
+We will also remove the variable "x", "user_name" and the time stamps, since we are not interested in make predictions based on those variables.
+```{r reomve x and timestamps}
+training <- training[,-c(1:7)]
+```
+
+```{r training new dimension,echo= FALSE}
+tr.cols <- ncol(training)
+```
+
+Finally, we are left with only `r tr.cols` variables.
+
+Now we have to make the same transformations to our testing data set. After a quick check, we can see there is no 'classe' variable, instead we have 'problem_id', we will change this name first.
+```{r change classe name variable}
+colnames(testing)[160] <- c("classe")
+```
+
+Now, lets get rid of the variables that are not of interest for this model:
+```{r }
+testing <- testing[,colnames(training)]
+```
+
+So, the new dimenssions of our testing set are:
+```{r testing dimensions}
+dim(testing)
+```
+
+### Data Modeling
+
+#### Parametters Settings
+
+We will use the 'train()' function from the *caret* package. The method we will use is *rf* Random Forest. For resampling we will use the method of *cross validation* and a number of *10 folds*.
+
+```{r data modeling, cache=TRUE, results="hide"}
+library(caret)
+set.seed(123)
+model.rf <- train(classe ~ ., data = training, method = "rf",
+                  trControl = trainControl(method = "cv", number = 10, verboseIter = TRUE))
+```
+
+```{r model}
+model.rf
+model.rf$finalModel$err.rate[500,1]
+```
+
+
+This is our result, a ***Random Forest*** model with 500 trees, 2 variables for split, a OOB estimate error of 0.43% and an accuracy of 99.52%
+
+Finally, our predictions:
+```{r finalmodel}
+predictions.rf <- predict(model.rf, testing)
+predictions.rf
+```
+
